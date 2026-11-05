@@ -68,9 +68,12 @@ jobs:
     - name: Prepare the build environment
       run: |
         sudo apt-get update
-        DEBIAN_FRONTEND=noninteractive sudo apt-get install -yq \
-            linux-modules-extra-$(uname -r) \
-            git python3 tar aria2
+        if apt-cache show "linux-modules-extra-$(uname -r)" >/dev/null 2>&1; then
+          DEBIAN_FRONTEND=noninteractive sudo apt-get install -yq "linux-modules-extra-$(uname -r)"
+        else
+          echo "linux-modules-extra-$(uname -r) not available in repo, skipping"
+        fi
+        DEBIAN_FRONTEND=noninteractive sudo apt-get install -yq git python3 tar aria2
         git clone https://gitlab.com/OrangeFox/misc/scripts || { sleep 10; git clone https://gitlab.com/OrangeFox/misc/scripts; }
         cd scripts
         sudo bash setup/android_build_env.sh
