@@ -41,6 +41,10 @@ on:
         description: 'BUILD_TARGET'
         required: true
         default: 'vendorboot'
+      RELEASE_CONFIG:
+        description: 'RELEASE_CONFIG (for fox_16.0 use bp2a; older branches leave as-is and it is ignored)'
+        required: true
+        default: 'bp2a'
 
 jobs:
   build:
@@ -124,18 +128,32 @@ jobs:
       with:
         swap-size-gb: 12
 
+    - name: Setup ccache
+      uses: actions/cache@v4
+      with:
+        path: ~/.ccache
+        key: ccache-fox${{ github.event.inputs.MANIFEST_BRANCH }}-${{ github.event.inputs.DEVICE_NAME }}-${{ github.run_id }}
+        restore-keys: |
+          ccache-fox${{ github.event.inputs.MANIFEST_BRANCH }}-${{ github.event.inputs.DEVICE_NAME }}-
+          ccache-fox${{ github.event.inputs.MANIFEST_BRANCH }}-
+
     - name: Building recovery
       run: |
         cd ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}
         set +e
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
+        export FOX_BUILD_DEVICE=${{ github.event.inputs.DEVICE_NAME }}
+        export USE_CCACHE=1
+        export CCACHE_DIR=~/.ccache
+        export CCACHE_COMPRESS=true
+        ccache -M 6G
         set -e
-        lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng && make clean && mka adbd ${{ github.event.inputs.BUILD_TARGET }}image -j$(nproc --all)
+        lunch ${{ github.event.inputs.MAKEFILE_NAME }}-${{ github.event.inputs.RELEASE_CONFIG }}-eng && mka adbd ${{ github.event.inputs.BUILD_TARGET }}image -j$(nproc --all)
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
-      continue-on-error: true
 
     - name: Check the output directory before uploading
+      if: success()
       run: |
         ls -al ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}/out/target/product/
         echo
